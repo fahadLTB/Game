@@ -2,124 +2,168 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Racing Game</title>
+<title>2D Racing Game</title>
 <style>
-body { margin:0; overflow:hidden; }
-#ui {
-    position:absolute;
-    top:10px;
-    left:10px;
-    color:white;
-    font-family:Arial;
-}
+    body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        background: #111;
+        color: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .game-container {
+        position: relative;
+        width: 400px;
+        height: 600px;
+        background: #333;
+        overflow: hidden;
+        border: 2px solid #fff;
+    }
+    .player {
+        position: absolute;
+        bottom: 20px;
+        left: 175px;
+        width: 50px;
+        height: 100px;
+        background: red;
+        border-radius: 10px;
+    }
+    .obstacle {
+        position: absolute;
+        width: 50px;
+        height: 100px;
+        background: blue;
+        border-radius: 10px;
+    }
+    .score-board {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        width: 400px;
+    }
+    button {
+        background: #444;
+        color: #fff;
+        border: none;
+        padding: 5px 10px;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+    button:hover {
+        background: #666;
+    }
 </style>
 </head>
-
 <body>
 
-<div id="ui">Loading...</div>
+<h1>🏎️ 2D Racing Game</h1>
+<div class="game-container" id="gameContainer">
+    <div class="player" id="player"></div>
+</div>
+<div class="score-board">
+    <span>Score: <span id="score">0</span></span>
+    <button id="restartBtn">Restart</button>
+</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+    const player = document.getElementById("player");
+    const gameContainer = document.getElementById("gameContainer");
+    const scoreElement = document.getElementById("score");
+    const restartBtn = document.getElementById("restartBtn");
 
-<script type="module">
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.128/examples/jsm/loaders/GLTFLoader.js";
+    let playerPosition = 175;
+    let obstacles = [];
+    let gameInterval;
+    let obstacleSpeed = 5;
+    let score = 0;
+    let gameOver = false;
 
-try {
-
-let scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87ceeb);
-
-let camera = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-camera.position.set(0,3,6);
-
-let renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
-
-// LIGHT
-scene.add(new THREE.DirectionalLight(0xffffff,1));
-scene.add(new THREE.AmbientLight(0xffffff,0.6));
-
-// ROAD TEXTURE (from ROOT)
-const tex = new THREE.TextureLoader().load("road.jpg");
-tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-tex.repeat.set(1,20);
-
-let road = new THREE.Mesh(
-    new THREE.PlaneGeometry(10,200),
-    new THREE.MeshStandardMaterial({map:tex})
-);
-road.rotation.x = -Math.PI/2;
-road.position.z = -100;
-scene.add(road);
-
-// PLAYER CAR
-let player = null;
-
-const loader = new GLTFLoader();
-loader.load(
-    "car.glb", // ROOT FILE
-    (gltf)=>{
-        player = gltf.scene;
-        player.scale.set(0.02,0.02,0.02);
-        scene.add(player);
-        document.getElementById("ui").innerText = "Game Running";
-    },
-    undefined,
-    (error)=>{
-        console.error("Model load error:", error);
-        document.getElementById("ui").innerText = "Car failed to load ❌";
-    }
-);
-
-// TRAFFIC
-let traffic = [];
-for(let i=0;i<6;i++){
-    let car = new THREE.Mesh(
-        new THREE.BoxGeometry(1,0.5,2),
-        new THREE.MeshStandardMaterial({color:Math.random()*0xffffff})
-    );
-    car.position.set(Math.random()*6-3,0.3,-Math.random()*200);
-    scene.add(car);
-    traffic.push(car);
-}
-
-let speed = 0.2;
-
-// CONTROLS
-document.addEventListener("keydown", e=>{
-    if(!player) return;
-    if(e.key==="ArrowLeft") player.position.x -= 0.5;
-    if(e.key==="ArrowRight") player.position.x += 0.5;
-});
-
-// LOOP
-function animate(){
-    requestAnimationFrame(animate);
-
-    tex.offset.y += speed;
-
-    traffic.forEach(c=>{
-        c.position.z += speed*5;
-        if(c.position.z > 5){
-            c.position.z = -200;
-            c.position.x = Math.random()*6-3;
+    // Player controls
+    document.addEventListener("keydown", (e) => {
+        if(e.key === "ArrowLeft" && playerPosition > 0) {
+            playerPosition -= 20;
+            player.style.left = playerPosition + "px";
+        } else if(e.key === "ArrowRight" && playerPosition < 350) {
+            playerPosition += 20;
+            player.style.left = playerPosition + "px";
         }
     });
 
-    if(player){
-        camera.position.x = player.position.x;
+    // Create obstacles
+    function createObstacle() {
+        const obs = document.createElement("div");
+        obs.classList.add("obstacle");
+        obs.style.left = Math.floor(Math.random() * 8) * 50 + "px";
+        obs.style.top = "-100px";
+        gameContainer.appendChild(obs);
+        obstacles.push(obs);
     }
 
-    renderer.render(scene,camera);
-}
+    // Move obstacles
+    function moveObstacles() {
+        obstacles.forEach((obs, index) => {
+            let top = parseInt(obs.style.top);
+            top += obstacleSpeed;
+            obs.style.top = top + "px";
 
-animate();
+            // Collision detection
+            const obsLeft = parseInt(obs.style.left);
+            const obsRight = obsLeft + 50;
+            const playerLeft = playerPosition;
+            const playerRight = playerPosition + 50;
+            const playerTop = 500;
+            const playerBottom = 600;
 
-} catch(e) {
-    document.body.innerHTML = "<h1 style='color:red'>ERROR: "+e+"</h1>";
-    console.error(e);
-}
+            if(top + 100 > playerTop && top < playerBottom &&
+               obsRight > playerLeft && obsLeft < playerRight) {
+                endGame();
+            }
+
+            // Remove obstacle and increment score
+            if(top > 600) {
+                obs.remove();
+                obstacles.splice(index, 1);
+                score++;
+                scoreElement.innerText = score;
+
+                // Optional: gradually increase speed
+                if(score % 5 === 0) obstacleSpeed += 1;
+            }
+        });
+    }
+
+    // Game loop
+    function startGame() {
+        gameInterval = setInterval(() => {
+            if(Math.random() < 0.02) createObstacle();
+            moveObstacles();
+        }, 30);
+    }
+
+    function endGame() {
+        clearInterval(gameInterval);
+        gameOver = true;
+        alert("💥 Game Over! Your score: " + score);
+    }
+
+    restartBtn.addEventListener("click", () => {
+        if(gameOver) {
+            obstacles.forEach(obs => obs.remove());
+            obstacles = [];
+            playerPosition = 175;
+            player.style.left = playerPosition + "px";
+            score = 0;
+            scoreElement.innerText = score;
+            obstacleSpeed = 5;
+            gameOver = false;
+            startGame();
+        }
+    });
+
+    // Start automatically
+    startGame();
 </script>
 
 </body>
