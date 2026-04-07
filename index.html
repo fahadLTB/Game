@@ -2,169 +2,103 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>2D Racing Game</title>
+<title>Chess Game</title>
 <style>
-    body {
-        margin: 0;
-        font-family: Arial, sans-serif;
-        background: #111;
-        color: #fff;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-    }
-    .game-container {
-        position: relative;
-        width: 400px;
-        height: 600px;
-        background: #333;
-        overflow: hidden;
-        border: 2px solid #fff;
-    }
-    .player {
-        position: absolute;
-        bottom: 20px;
-        left: 175px;
-        width: 50px;
-        height: 100px;
-        background: red;
-        border-radius: 10px;
-    }
-    .obstacle {
-        position: absolute;
-        width: 50px;
-        height: 100px;
-        background: blue;
-        border-radius: 10px;
-    }
-    .score-board {
-        margin-top: 10px;
-        display: flex;
-        justify-content: space-between;
-        width: 400px;
-    }
-    button {
-        background: #444;
-        color: #fff;
-        border: none;
-        padding: 5px 10px;
-        cursor: pointer;
-        border-radius: 5px;
-    }
-    button:hover {
-        background: #666;
-    }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-family: Arial, sans-serif;
+    background: #eee;
+  }
+  h1 {
+    margin-top: 20px;
+  }
+  table {
+    border-collapse: collapse;
+    margin-top: 20px;
+  }
+  td {
+    width: 60px;
+    height: 60px;
+    text-align: center;
+    vertical-align: middle;
+    font-size: 48px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .white { background: #f0d9b5; }
+  .black { background: #b58863; }
+  .highlight { outline: 3px solid yellow; }
 </style>
 </head>
 <body>
-
-<h1>🏎️ 2D Racing Game</h1>
-<div class="game-container" id="gameContainer">
-    <div class="player" id="player"></div>
-</div>
-<div class="score-board">
-    <span>Score: <span id="score">0</span></span>
-    <button id="restartBtn">Restart</button>
-</div>
-
+<h1>♟️ Chess Game ♟️</h1>
+<table id="board"></table>
 <script>
-    const player = document.getElementById("player");
-    const gameContainer = document.getElementById("gameContainer");
-    const scoreElement = document.getElementById("score");
-    const restartBtn = document.getElementById("restartBtn");
+const boardElement = document.getElementById("board");
+let selectedCell = null;
+let turn = 'w'; // w=white, b=black
 
-    let playerPosition = 175;
-    let obstacles = [];
-    let gameInterval;
-    let obstacleSpeed = 5;
-    let score = 0;
-    let gameOver = false;
+// Initial chess setup using Unicode pieces
+let board = [
+  ['♜','♞','♝','♛','♚','♝','♞','♜'],
+  ['♟','♟','♟','♟','♟','♟','♟','♟'],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['','','','','','','',''],
+  ['♙','♙','♙','♙','♙','♙','♙','♙'],
+  ['♖','♘','♗','♕','♔','♗','♘','♖']
+];
 
-    // Player controls
-    document.addEventListener("keydown", (e) => {
-        if(e.key === "ArrowLeft" && playerPosition > 0) {
-            playerPosition -= 20;
-            player.style.left = playerPosition + "px";
-        } else if(e.key === "ArrowRight" && playerPosition < 350) {
-            playerPosition += 20;
-            player.style.left = playerPosition + "px";
-        }
-    });
-
-    // Create obstacles
-    function createObstacle() {
-        const obs = document.createElement("div");
-        obs.classList.add("obstacle");
-        obs.style.left = Math.floor(Math.random() * 8) * 50 + "px";
-        obs.style.top = "-100px";
-        gameContainer.appendChild(obs);
-        obstacles.push(obs);
+function renderBoard() {
+  boardElement.innerHTML = '';
+  for(let i=0;i<8;i++){
+    const row = document.createElement('tr');
+    for(let j=0;j<8;j++){
+      const cell = document.createElement('td');
+      cell.className = (i+j)%2===0 ? 'white' : 'black';
+      cell.textContent = board[i][j];
+      cell.dataset.row = i;
+      cell.dataset.col = j;
+      cell.addEventListener('click', onCellClick);
+      row.appendChild(cell);
     }
+    boardElement.appendChild(row);
+  }
+}
 
-    // Move obstacles
-    function moveObstacles() {
-        obstacles.forEach((obs, index) => {
-            let top = parseInt(obs.style.top);
-            top += obstacleSpeed;
-            obs.style.top = top + "px";
+function onCellClick(e) {
+  const row = parseInt(e.target.dataset.row);
+  const col = parseInt(e.target.dataset.col);
+  const piece = board[row][col];
 
-            // Collision detection
-            const obsLeft = parseInt(obs.style.left);
-            const obsRight = obsLeft + 50;
-            const playerLeft = playerPosition;
-            const playerRight = playerPosition + 50;
-            const playerTop = 500;
-            const playerBottom = 600;
+  // Select a piece
+  if(selectedCell === null && piece !== '' && isTurn(piece)) {
+    selectedCell = {row, col, piece};
+    e.target.classList.add('highlight');
+    return;
+  }
 
-            if(top + 100 > playerTop && top < playerBottom &&
-               obsRight > playerLeft && obsLeft < playerRight) {
-                endGame();
-            }
+  // Move piece
+  if(selectedCell !== null) {
+    board[row][col] = selectedCell.piece;
+    board[selectedCell.row][selectedCell.col] = '';
+    turn = turn === 'w' ? 'b' : 'w';
+    selectedCell = null;
+    renderBoard();
+  }
+}
 
-            // Remove obstacle and increment score
-            if(top > 600) {
-                obs.remove();
-                obstacles.splice(index, 1);
-                score++;
-                scoreElement.innerText = score;
+// Check if piece belongs to current turn
+function isTurn(piece){
+  const whitePieces = '♔♕♖♗♘♙';
+  const blackPieces = '♚♛♜♝♞♟';
+  return (turn==='w' && whitePieces.includes(piece)) || (turn==='b' && blackPieces.includes(piece));
+}
 
-                // Optional: gradually increase speed
-                if(score % 5 === 0) obstacleSpeed += 1;
-            }
-        });
-    }
-
-    // Game loop
-    function startGame() {
-        gameInterval = setInterval(() => {
-            if(Math.random() < 0.02) createObstacle();
-            moveObstacles();
-        }, 30);
-    }
-
-    function endGame() {
-        clearInterval(gameInterval);
-        gameOver = true;
-        alert("💥 Game Over! Your score: " + score);
-    }
-
-    restartBtn.addEventListener("click", () => {
-        if(gameOver) {
-            obstacles.forEach(obs => obs.remove());
-            obstacles = [];
-            playerPosition = 175;
-            player.style.left = playerPosition + "px";
-            score = 0;
-            scoreElement.innerText = score;
-            obstacleSpeed = 5;
-            gameOver = false;
-            startGame();
-        }
-    });
-
-    // Start automatically
-    startGame();
+renderBoard();
 </script>
-
 </body>
 </html>
