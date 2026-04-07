@@ -2,103 +2,77 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Chess Game</title>
+<title>Snake Game</title>
 <style>
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    font-family: Arial, sans-serif;
-    background: #eee;
-  }
-  h1 {
-    margin-top: 20px;
-  }
-  table {
-    border-collapse: collapse;
-    margin-top: 20px;
-  }
-  td {
-    width: 60px;
-    height: 60px;
-    text-align: center;
-    vertical-align: middle;
-    font-size: 48px;
-    cursor: pointer;
-    user-select: none;
-  }
-  .white { background: #f0d9b5; }
-  .black { background: #b58863; }
-  .highlight { outline: 3px solid yellow; }
+  body { display:flex; flex-direction:column; align-items:center; background:#111; color:#fff; font-family:Arial; }
+  h1 { margin-top:20px; }
+  canvas { background:#222; margin-top:20px; border:2px solid #fff; }
+  .score { margin-top:10px; font-size:20px; }
 </style>
 </head>
 <body>
-<h1>♟️ Chess Game ♟️</h1>
-<table id="board"></table>
+<h1>🐍 Snake Game</h1>
+<canvas id="gameCanvas" width="400" height="400"></canvas>
+<div class="score">Score: <span id="score">0</span></div>
+
 <script>
-const boardElement = document.getElementById("board");
-let selectedCell = null;
-let turn = 'w'; // w=white, b=black
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const box = 20;
+let snake = [{x: 8*box, y: 8*box}];
+let food = {x: Math.floor(Math.random()*20)*box, y: Math.floor(Math.random()*20)*box};
+let score = 0;
+let direction = null;
+let game;
 
-// Initial chess setup using Unicode pieces
-let board = [
-  ['♜','♞','♝','♛','♚','♝','♞','♜'],
-  ['♟','♟','♟','♟','♟','♟','♟','♟'],
-  ['','','','','','','',''],
-  ['','','','','','','',''],
-  ['','','','','','','',''],
-  ['','','','','','','',''],
-  ['♙','♙','♙','♙','♙','♙','♙','♙'],
-  ['♖','♘','♗','♕','♔','♗','♘','♖']
-];
+document.addEventListener('keydown', e => {
+  if(e.key==='ArrowLeft' && direction!=='RIGHT') direction='LEFT';
+  else if(e.key==='ArrowRight' && direction!=='LEFT') direction='RIGHT';
+  else if(e.key==='ArrowUp' && direction!=='DOWN') direction='UP';
+  else if(e.key==='ArrowDown' && direction!=='UP') direction='DOWN';
+});
 
-function renderBoard() {
-  boardElement.innerHTML = '';
-  for(let i=0;i<8;i++){
-    const row = document.createElement('tr');
-    for(let j=0;j<8;j++){
-      const cell = document.createElement('td');
-      cell.className = (i+j)%2===0 ? 'white' : 'black';
-      cell.textContent = board[i][j];
-      cell.dataset.row = i;
-      cell.dataset.col = j;
-      cell.addEventListener('click', onCellClick);
-      row.appendChild(cell);
-    }
-    boardElement.appendChild(row);
+function draw(){
+  ctx.fillStyle = '#222';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // Draw snake
+  for(let i=0;i<snake.length;i++){
+    ctx.fillStyle = i===0 ? 'lime' : 'green';
+    ctx.fillRect(snake[i].x, snake[i].y, box, box);
   }
-}
 
-function onCellClick(e) {
-  const row = parseInt(e.target.dataset.row);
-  const col = parseInt(e.target.dataset.col);
-  const piece = board[row][col];
+  // Draw food
+  ctx.fillStyle = 'red';
+  ctx.fillRect(food.x, food.y, box, box);
 
-  // Select a piece
-  if(selectedCell === null && piece !== '' && isTurn(piece)) {
-    selectedCell = {row, col, piece};
-    e.target.classList.add('highlight');
+  // Move snake
+  let head = {...snake[0]};
+  if(direction==='LEFT') head.x -= box;
+  if(direction==='RIGHT') head.x += box;
+  if(direction==='UP') head.y -= box;
+  if(direction==='DOWN') head.y += box;
+
+  // Check collision with walls
+  if(head.x<0 || head.x>=canvas.width || head.y<0 || head.y>=canvas.height || snake.some(s=>s.x===head.x && s.y===head.y)){
+    clearInterval(game);
+    alert('💥 Game Over! Score: '+score);
     return;
   }
 
-  // Move piece
-  if(selectedCell !== null) {
-    board[row][col] = selectedCell.piece;
-    board[selectedCell.row][selectedCell.col] = '';
-    turn = turn === 'w' ? 'b' : 'w';
-    selectedCell = null;
-    renderBoard();
+  snake.unshift(head);
+
+  // Check if ate food
+  if(head.x===food.x && head.y===food.y){
+    score++;
+    document.getElementById('score').innerText=score;
+    food = {x: Math.floor(Math.random()*20)*box, y: Math.floor(Math.random()*20)*box};
+  } else {
+    snake.pop();
   }
 }
 
-// Check if piece belongs to current turn
-function isTurn(piece){
-  const whitePieces = '♔♕♖♗♘♙';
-  const blackPieces = '♚♛♜♝♞♟';
-  return (turn==='w' && whitePieces.includes(piece)) || (turn==='b' && blackPieces.includes(piece));
-}
-
-renderBoard();
+game = setInterval(draw,100);
 </script>
 </body>
 </html>
