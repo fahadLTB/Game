@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Angry Birds Clone - Levels</title>
+<title>Angry Birds Harder Levels</title>
 <style>
   body { margin:0; background:#87CEEB; display:flex; flex-direction:column; align-items:center; font-family:Arial; }
   canvas { background:#87CEEB; border:2px solid #000; margin-top:20px; }
@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<h1>🐦 Angry Birds Clone</h1>
+<h1>🐦 Angry Birds - Harder Levels</h1>
 <canvas id="gameCanvas" width="800" height="400"></canvas>
 <div id="score">Score: 0</div>
 <div id="level">Level: 1</div>
@@ -29,17 +29,28 @@ let score = 0;
 let level = 1;
 let blocks = [];
 
-const levelData = [
-  [{x:600,y:300,width:40,height:40},{x:640,y:300,width:40,height:40},{x:620,y:260,width:40,height:40}],
-  [{x:580,y:300,width:40,height:40},{x:620,y:300,width:40,height:40},{x:660,y:300,width:40,height:40},{x:600,y:260,width:40,height:40},{x:640,y:260,width:40,height:40}],
-  [{x:560,y:300,width:40,height:40},{x:600,y:300,width:40,height:40},{x:640,y:300,width:40,height:40},{x:680,y:300,width:40,height:40},{x:580,y:260,width:40,height:40},{x:620,y:260,width:40,height:40},{x:660,y:260,width:40,height:40}]
-];
+function generateBlocks(num){
+  let newBlocks=[];
+  for(let i=0;i<num;i++){
+    let block={width:40,height:40};
+    let collision=true;
+    while(collision){ // avoid overlapping
+      block.x = 400 + Math.random()*350; // right side
+      block.y = 100 + Math.random()*200; 
+      collision = newBlocks.some(b=> Math.abs(b.x-block.x)<50 && Math.abs(b.y-block.y)<50);
+    }
+    block.hit=false;
+    newBlocks.push(block);
+  }
+  return newBlocks;
+}
 
 function loadLevel(lvl){
-  blocks = JSON.parse(JSON.stringify(levelData[lvl-1])); // deep copy
+  let numBlocks = 3 + lvl*2; // more blocks each level
+  blocks = generateBlocks(numBlocks);
   bird = {x:150, y:300, radius:15, vx:0, vy:0, isFlying:false};
-  document.getElementById('level').innerText = "Level: " + lvl;
-  document.getElementById('nextLevel').style.display = 'none';
+  document.getElementById('level').innerText = "Level: "+lvl;
+  document.getElementById('nextLevel').style.display='none';
 }
 
 loadLevel(level);
@@ -71,7 +82,7 @@ canvas.addEventListener('mouseup', e=>{
   }
 });
 
-// Draw and update game
+// Draw and update
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -92,10 +103,12 @@ function draw(){
   }
 
   // Blocks
+  let allHit = true;
   blocks.forEach(block=>{
     if(!block.hit){
       ctx.fillStyle='brown';
       ctx.fillRect(block.x,block.y,block.width,block.height);
+      allHit=false;
     }
   });
 
@@ -105,28 +118,25 @@ function draw(){
     bird.x += bird.vx;
     bird.y += bird.vy;
 
-    // Collision with blocks
-    let allHit = true;
+    // Collision
     blocks.forEach(block=>{
       if(!block.hit &&
          bird.x+bird.radius>block.x && bird.x-bird.radius<block.x+block.width &&
          bird.y+bird.radius>block.y && bird.y-bird.radius<block.y+block.height){
         block.hit=true;
         score+=10;
-        document.getElementById('score').innerText = "Score: "+score;
+        document.getElementById('score').innerText="Score: "+score;
         bird.vx*=-0.3;
         bird.vy*=-0.3;
       }
-      if(!block.hit) allHit=false;
     });
 
-    // Next level if all blocks destroyed
     if(allHit){
       bird.isFlying=false;
       document.getElementById('nextLevel').style.display='inline';
     }
 
-    // Reset bird if offscreen
+    // Reset if offscreen
     if(bird.y>canvas.height || bird.x>canvas.width || bird.x<0){
       bird = {x:150, y:300, radius:15, vx:0, vy:0, isFlying:false};
     }
@@ -137,14 +147,10 @@ function draw(){
 
 draw();
 
-// Next level button
+// Next level
 document.getElementById('nextLevel').addEventListener('click', ()=>{
-  if(level<levelData.length){
-    level++;
-    loadLevel(level);
-  } else {
-    alert("🎉 You completed all levels!");
-  }
+  level++;
+  loadLevel(level);
 });
 </script>
 </body>
