@@ -2,23 +2,23 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Racing Game</title>
+<title>Improved Racing Game</title>
 
 <style>
 body {
     margin: 0;
     overflow: hidden;
-    background: #87ceeb;
+    background: linear-gradient(#87ceeb, #e0f7ff);
     font-family: Arial;
 }
 
 #ui {
     position: absolute;
-    top: 20px;
+    top: 15px;
     left: 20px;
-    color: white;
-    z-index: 10;
-    font-size: 20px;
+    color: black;
+    font-size: 18px;
+    font-weight: bold;
 }
 </style>
 </head>
@@ -33,11 +33,52 @@ body {
 let scene, camera, renderer;
 let playerCar;
 let traffic = [];
-let road;
-let speed = 0.3;
+let roadSegments = [];
+let speed = 0.15;   // slower start
+let maxSpeed = 0.6;
 
 init();
 animate();
+
+function createCar(color=0xff0000){
+    let car = new THREE.Group();
+
+    // body
+    let body = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2,0.4,2.5),
+        new THREE.MeshStandardMaterial({color})
+    );
+
+    // top cabin
+    let top = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8,0.4,1.2),
+        new THREE.MeshStandardMaterial({color:0x222222})
+    );
+    top.position.set(0,0.4,0);
+
+    // wheels
+    let wheelGeo = new THREE.CylinderGeometry(0.25,0.25,0.3,16);
+    let wheelMat = new THREE.MeshStandardMaterial({color:0x000000});
+
+    function wheel(x,z){
+        let w = new THREE.Mesh(wheelGeo, wheelMat);
+        w.rotation.z = Math.PI/2;
+        w.position.set(x, -0.2, z);
+        car.add(w);
+    }
+
+    wheel(-0.6, 0.9);
+    wheel(0.6, 0.9);
+    wheel(-0.6, -0.9);
+    wheel(0.6, -0.9);
+
+    car.add(body);
+    car.add(top);
+
+    car.position.y = 0.3;
+
+    return car;
+}
 
 function init() {
     scene = new THREE.Scene();
@@ -53,63 +94,36 @@ function init() {
     const sun = new THREE.DirectionalLight(0xffffff, 1);
     sun.position.set(10,10,5);
     scene.add(sun);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
     // ROAD
-    const roadGeo = new THREE.PlaneGeometry(10, 400);
-    const roadMat = new THREE.MeshStandardMaterial({color:0x333333});
-    road = new THREE.Mesh(roadGeo, roadMat);
-    road.rotation.x = -Math.PI/2;
-    road.position.z = -150;
-    scene.add(road);
-
-    // LANE MARKINGS
-    for(let i=0;i<20;i++){
-        let line = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.2, 4),
-            new THREE.MeshBasicMaterial({color:0xffffff})
+    for(let i=0;i<5;i++){
+        let road = new THREE.Mesh(
+            new THREE.PlaneGeometry(10, 100),
+            new THREE.MeshStandardMaterial({color:0x333333})
         );
-        line.rotation.x = -Math.PI/2;
-        line.position.set(0, 0.01, -i*20);
-        scene.add(line);
+        road.rotation.x = -Math.PI/2;
+        road.position.z = -i * 100;
+        scene.add(road);
+        roadSegments.push(road);
     }
 
-    // PLAYER CAR (better shape)
-    const car = new THREE.Group();
-
-    const body = new THREE.Mesh(
-        new THREE.BoxGeometry(1.2, 0.4, 2.5),
-        new THREE.MeshStandardMaterial({color:0xff0000})
-    );
-
-    const top = new THREE.Mesh(
-        new THREE.BoxGeometry(0.8, 0.4, 1.2),
-        new THREE.MeshStandardMaterial({color:0xaa0000})
-    );
-    top.position.y = 0.4;
-
-    car.add(body);
-    car.add(top);
-
-    car.position.y = 0.3;
-    scene.add(car);
-    playerCar = car;
+    // PLAYER
+    playerCar = createCar(0xff0000);
+    scene.add(playerCar);
 
     // TRAFFIC
-    for(let i=0;i<8;i++){
-        let tcar = new THREE.Mesh(
-            new THREE.BoxGeometry(1,0.5,2),
-            new THREE.MeshStandardMaterial({color:Math.random()*0xffffff})
-        );
-        tcar.position.set((Math.random()*6-3), 0.25, -Math.random()*200);
-        scene.add(tcar);
-        traffic.push(tcar);
+    for(let i=0;i<10;i++){
+        let car = createCar(Math.random()*0xffffff);
+        car.position.set(Math.random()*6-3, 0.3, -Math.random()*300);
+        scene.add(car);
+        traffic.push(car);
     }
 
-    // CONTROLS
+    // CONTROLS (smooth)
     document.addEventListener("keydown", e=>{
-        if(e.key==="ArrowLeft") playerCar.position.x -= 0.5;
-        if(e.key==="ArrowRight") playerCar.position.x += 0.5;
+        if(e.key==="ArrowLeft") playerCar.position.x -= 0.4;
+        if(e.key==="ArrowRight") playerCar.position.x += 0.4;
     });
 
     window.addEventListener("resize", ()=>{
@@ -122,33 +136,47 @@ function init() {
 function animate(){
     requestAnimationFrame(animate);
 
-    speed += 0.0005;
-
-    // MOVE ROAD
-    road.position.z += speed*5;
-    if(road.position.z > 0){
-        road.position.z = -150;
+    // smooth speed increase
+    if(speed < maxSpeed){
+        speed += 0.0005;
     }
 
-    // MOVE TRAFFIC
+    // ROAD LOOP
+    roadSegments.forEach(road=>{
+        road.position.z += speed*5;
+        if(road.position.z > 50){
+            road.position.z -= 500;
+        }
+    });
+
+    // TRAFFIC
     traffic.forEach(car=>{
         car.position.z += speed*5;
 
         if(car.position.z > 5){
-            car.position.z = -200;
+            car.position.z = -300;
             car.position.x = Math.random()*6-3;
         }
 
-        // COLLISION
+        // COLLISION → reset instead of stop
         if(Math.abs(car.position.z - playerCar.position.z) < 1.5 &&
            Math.abs(car.position.x - playerCar.position.x) < 1){
-            alert("💥 Crash!");
-            location.reload();
+
+            speed = 0.15; // reset speed
+            playerCar.position.x = 0;
+
+            // move traffic away
+            traffic.forEach(c=>{
+                c.position.z = -Math.random()*300;
+            });
         }
     });
 
+    // slight tilt (real feel)
+    playerCar.rotation.z = -playerCar.position.x * 0.2;
+
     // CAMERA FOLLOW
-    camera.position.x = playerCar.position.x;
+    camera.position.x += (playerCar.position.x - camera.position.x) * 0.1;
 
     document.getElementById("speed").innerText = speed.toFixed(2);
 
